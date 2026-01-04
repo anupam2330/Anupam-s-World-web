@@ -42,7 +42,7 @@ No backend setup is required—just open and chat!
 ### Method 2: For Audio Calls (HTTPS Required) ⚠️
 To use the **Microphone** for Calls and Voice Notes on mobile devices, the app must be served over **HTTPS**.
 1.  Upload the `index.html` file to a free hosting provider like **Netlify**, **Vercel**, or **GitHub Pages**.
-2.  Open the provided link (e.g., `https://your-project.netlify.app`).
+2.  Open the provided link (e.g., `https://anupam2330.github.io/Anupam-s-World-web/`).
 3.  Share the link with a friend to test the call feature.
 
 ---
@@ -50,7 +50,8 @@ To use the **Microphone** for Calls and Voice Notes on mobile devices, the app m
 ## 📂 Project Structure
 
 ```text
-Anupams-World/
+Anupams-W<img width="1282" height="869" alt="Screenshot 2026-01-04 at 17 51 10" src="https://github.com/user-attachments/assets/8f52e439-b973-41a3-8f57-b5c844e88fd0" />
+orld/
 │
 ├── index.html       # The complete source code (HTML/CSS/JS)
 ├── README.md        # Project documentation
