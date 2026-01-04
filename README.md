@@ -47,12 +47,3 @@ To use the **Microphone** for Calls and Voice Notes on mobile devices, the app m
 
 ---
 
-## 📂 Project Structure
-
-```text
-Anupams-W<img width="1282" height="869" alt="Screenshot 2026-01-04 at 17 51 10" src="https://github.com/user-attachments/assets/8f52e439-b973-41a3-8f57-b5c844e88fd0" />
-orld/
-│
-├── index.html       # The complete source code (HTML/CSS/JS)
-├── README.md        # Project documentation
-└── screenshots/     # (Optional) Images of the app
