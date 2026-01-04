@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Anupam's World</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #38bdf8;
+            --bg-dark: #020617;
+            --card-bg: #0f172a;
+            --msg-mine: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+            --msg-theirs: #1e293b;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100dvh; 
+            overflow: hidden;
+            background-image: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+        }
+
+        /* Setup Screen */
+        .setup-overlay {
+            position: fixed; inset: 0; background: rgba(2, 6, 23, 0.98); z-index: 2000;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .setup-card {
+            background: var(--card-bg); padding: 30px; border-radius: 24px;
+            width: 80%; max-width: 350px; text-align: center;
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+        input {
+            width: 100%; padding: 15px; margin: 10px 0; border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1); background: #1e293b;
+            color: white; outline: none; box-sizing: border-box; font-size: 16px;
+        }
+        
+        .btn-main {
+            width: 100%; padding: 15px; border-radius: 12px; border: none;
+            background: var(--msg-mine); color: white; font-weight: 600; font-size: 16px;
+            cursor: pointer; margin-top: 10px;
+            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4);
+        }
+
+        /* Main App Container */
+        .app-container {
+            width: 100%; max-width: 500px; height: 100%; 
+            background: var(--card-bg); display: flex; flex-direction: column;
+            position: relative;
+        }
+
+        /* Header */
+        .header {
+            padding: 15px; background: rgba(15, 23, 42, 0.95);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 10; cursor: pointer;
+        }
+
+        /* Room Details (Online Users) */
+        #room-details {
+            position: absolute; top: 60px; left: 15px; right: 15px;
+            background: rgba(30, 41, 59, 0.98); border-radius: 16px;
+            padding: 20px; border: 1px solid rgba(255,255,255,0.1);
+            display: none; z-index: 50; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            animation: slideDown 0.3s ease;
+        }
+        @keyframes slideDown { from {opacity:0; transform:translateY(-10px);} to {opacity:1; transform:translateY(0);} }
+
+        .user-item { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; font-size: 14px; }
+        .dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; margin-right: 10px; box-shadow: 0 0 8px #10b981; }
+
+        /* Security Badge inside Room Details */
+        .encryption-note {
+            margin-top: 15px; font-size: 11px; color: #64748b; 
+            text-align: center; display: flex; align-items: center; justify-content: center; gap: 5px;
+        }
+
+        /* Messages Area */
+        #messages {
+            flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px;
+            background-image: radial-gradient(rgba(56, 189, 248, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+            scroll-behavior: smooth;
+        }
+
+        .msg {
+            max-width: 80%; padding: 10px 14px; border-radius: 18px; font-size: 15px; line-height: 1.4;
+            position: relative; word-wrap: break-word;
+            animation: popIn 0.3s ease;
+        }
+        @keyframes popIn { from{opacity:0; transform: scale(0.95);} to{opacity:1; transform: scale(1);} }
+
+        .mine { align-self: flex-end; background: var(--msg-mine); color: white; border-bottom-right-radius: 4px; }
+        .theirs { align-self: flex-start; background: var(--msg-theirs); border-bottom-left-radius: 4px; border: 1px solid rgba(255,255,255,0.05); }
+        
+        .meta { display: flex; justify-content: space-between; font-size: 10px; margin-top: 4px; opacity: 0.7; }
+
+        img { max-width: 100%; border-radius: 10px; margin-top: 5px; border: 1px solid rgba(255,255,255,0.1); }
+        audio { height: 32px; width: 200px; margin-top: 5px; border-radius: 20px; filter: invert(0.9) hue-rotate(180deg); }
+
+        /* Footer */
+        .footer {
+            padding: 10px; background: rgba(15, 23, 42, 0.95);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            position: relative;
+        }
+        .input-bar { display: flex; gap: 8px; align-items: center; }
+        .icon-btn { 
+            background: rgba(255,255,255,0.08); border: none; width: 42px; height: 42px; border-radius: 50%; 
+            cursor: pointer; color: var(--text-muted); font-size: 18px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; transition: 0.2s;
+        }
+        .icon-btn:hover { background: rgba(56, 189, 248, 0.1); color: var(--primary); }
+        #msg-input { margin: 0; border-radius: 25px; padding: 12px 15px; flex-grow: 1; background: #020617; border: none; }
+
+        /* Recording UI */
+        #recording-ui {
+            position: absolute; inset: 0; background: var(--card-bg); z-index: 20;
+            display: none; align-items: center; padding: 0 20px;
+            color: #ef4444; font-weight: 600;
+            animation: pulse-red 1.5s infinite;
+        }
+        @keyframes pulse-red { 0% {opacity: 1;} 50% {opacity: 0.7;} 100% {opacity: 1;} }
+
+        /* Image Preview Modal */
+        #img-preview-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 3000;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            backdrop-filter: blur(5px);
+        }
+        #preview-img { max-width: 90%; max-height: 60vh; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        .modal-btns { display: flex; gap: 20px; width: 80%; max-width: 300px; }
+        
+        /* Call UI */
+        #call-ui {
+            position: absolute; inset: 0; background: rgba(2, 6, 23, 0.95); z-index: 100;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            backdrop-filter: blur(10px);
+        }
+        .pulse-ring {
+            width: 80px; height: 80px; background: var(--msg-mine); border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; font-size: 30px;
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7);
+        }
+        @keyframes pulse { 0% {box-shadow: 0 0 0 0 rgba(56,189,248,0.7);} 70% {box-shadow: 0 0 0 25px rgba(56,189,248,0);} 100% {box-shadow: 0 0 0 0 rgba(56,189,248,0);} }
+
+    </style>
+</head>
+<body>
+
+    <audio id="snd-send" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3"></audio>
+    <audio id="snd-receive" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3"></audio>
+    <audio id="snd-ring" loop src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3"></audio>
+
+    <div id="setup-screen" class="setup-overlay">
+        <div class="setup-card">
+            <h2>Anupam's World</h2>
+            <input type="text" id="room-input" placeholder="Room Name (e.g. Adda)">
+            <input type="text" id="name-input" placeholder="Your Name">
+            <button class="btn-main" onclick="joinRoom()">Aaie baat karte hai</button>
+        </div>
+    </div>
+
+    <div id="img-preview-modal">
+        <h3 style="color:white">Confirm Send?</h3>
+        <img id="preview-img" src="">
+        <div class="modal-btns">
+            <button class="btn-main" style="background: #ef4444; margin-top:0;" onclick="cancelImage()">Cancel</button>
+            <button class="btn-main" style="margin-top:0;" onclick="confirmImageSend()">Send</button>
+        </div>
+    </div>
+
+    <div id="call-ui">
+        <div class="pulse-ring">📞</div>
+        <h3 id="call-status" style="margin-top:20px; color:white;">Connecting...</h3>
+        <div style="margin-top:30px; display:flex; gap:20px;">
+            <button class="icon-btn" onclick="answerCall()" id="answer-btn" style="background:#10b981; color:white; width:60px; height:60px; display:none;">✔</button>
+            <button class="icon-btn" onclick="endCall()" style="background:#ef4444; color:white; width:60px; height:60px;">✖</button>
+        </div>
+    </div>
+
+    <div class="app-container">
+        <div class="header" onclick="toggleDetails()">
+            <div>
+                <h3 id="header-room-name" style="margin:0; color:#e0f2fe;">Chat</h3>
+                <small id="status-text" style="color:var(--primary); font-size:11px;">Tap for Online Users</small>
+            </div>
+            <button class="icon-btn" onclick="event.stopPropagation(); startCall()" style="color:#10b981; background:transparent;">📞</button>
+        </div>
+
+        <div id="room-details">
+            <h4 style="margin:0 0 10px 0; color:var(--text-muted);">Active in <span id="detail-room-name"></span></h4>
+            <div id="user-list"></div>
+            
+            <div class="encryption-note">
+                <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+                End-to-end Encrypted
+            </div>
+        </div>
+
+        <div id="messages"></div>
+
+        <div class="footer">
+            <div id="recording-ui">
+                <span>🔴 Recording... <span id="rec-time">0:00</span></span>
+                <div style="margin-left:auto; display:flex; gap:10px;">
+                    <button class="icon-btn" onclick="stopRecording(false)" style="color:#ef4444; background:transparent;">✖</button>
+                    <button class="icon-btn" onclick="stopRecording(true)" style="background:#10b981; color:white;">✔</button>
+                </div>
+            </div>
+
+            <div class="input-bar">
+                <input type="file" id="file-input" hidden accept="image/*" onchange="previewFile(this)">
+                <button class="icon-btn" onclick="document.getElementById('file-input').click()">📷</button>
+                <button class="icon-btn" onclick="startRecording()">🎙️</button>
+                <input type="text" id="msg-input" placeholder="Type message...">
+                <button class="icon-btn" style="background:var(--primary); color:black;" onclick="sendMessage()">➤</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let client, roomName, userName;
+        let localStream, peerConn;
+        let pendingImage = null; 
+        let mediaRecorder, audioChunks = [];
+        let recInterval, recStartTime;
+        let onlineUsers = new Set();
+        
+        const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+        function joinRoom() {
+            roomName = document.getElementById('room-input').value.trim();
+            userName = document.getElementById('name-input').value.trim();
+            if (!roomName || !userName) return alert("Please fill details!");
+
+            document.getElementById('header-room-name').innerText = roomName;
+            document.getElementById('detail-room-name').innerText = roomName;
+            
+            client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+            
+            client.on('connect', () => {
+                document.getElementById('setup-screen').style.display = 'none';
+                
+                loadHistory();
+
+                client.subscribe(`${roomName}/chat`);
+                client.subscribe(`${roomName}/signal`); 
+                client.subscribe(`${roomName}/presence`);
+                
+                publishPresence('join');
+                addOnlineUser(userName);
+            });
+
+            client.on('message', (topic, payload) => {
+                const data = JSON.parse(payload.toString());
+
+                if (topic === `${roomName}/chat`) {
+                    if (data.sender !== userName) {
+                        playAudio('snd-receive');
+                        renderMessage(data, 'theirs');
+                        saveToHistory(data);
+                    }
+                } 
+                else if (topic === `${roomName}/signal`) { handleSignaling(data); }
+                else if (topic === `${roomName}/presence`) { handlePresence(data); }
+            });
+        }
+
+        // --- Presence ---
+        function publishPresence(type) {
+            client.publish(`${roomName}/presence`, JSON.stringify({ type, user: userName }));
+        }
+
+        function handlePresence(data) {
+            if (data.type === 'join') {
+                addOnlineUser(data.user);
+                if (data.user !== userName) publishPresence('exist');
+            } else if (data.type === 'exist') {
+                addOnlineUser(data.user);
+            }
+        }
+
+        function addOnlineUser(user) {
+            if (!onlineUsers.has(user)) {
+                onlineUsers.add(user);
+                const div = document.createElement('div');
+                div.className = 'user-item';
+                div.innerHTML = `<span class="dot"></span>${user}`;
+                document.getElementById('user-list').appendChild(div);
+            }
+        }
+
+        function toggleDetails() {
+            const modal = document.getElementById('room-details');
+            modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // --- Recording ---
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.start();
+                document.getElementById('recording-ui').style.display = 'flex';
+                recStartTime = Date.now();
+                recInterval = setInterval(() => {
+                    const s = Math.floor((Date.now() - recStartTime) / 1000);
+                    document.getElementById('rec-time').innerText = `0:${s < 10 ? '0'+s : s}`;
+                }, 1000);
+            } catch (e) { alert("Mic access denied!"); }
+        }
+
+        function stopRecording(send) {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(t => t.stop());
+            }
+            clearInterval(recInterval);
+            document.getElementById('recording-ui').style.display = 'none';
+
+            if (send) {
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = () => {
+                        publishMessage({ type: 'audio', audio: reader.result });
+                    };
+                };
+            }
+        }
+
+        // --- Messaging ---
+        function publishMessage(data) {
+            const payload = { ...data, sender: userName, id: Date.now(), time: getTime() };
+            client.publish(`${roomName}/chat`, JSON.stringify(payload));
+            if (data.type !== 'sys') {
+                renderMessage(payload, 'mine');
+                saveToHistory(payload); 
+                playAudio('snd-send');
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('msg-input');
+            if (input.value.trim()) {
+                publishMessage({ type: 'text', text: input.value });
+                input.value = '';
+            }
+        }
+
+        function renderMessage(data, type) {
+            const div = document.createElement('div');
+            div.className = `msg ${type}`;
+            let content = '';
+            if (data.type === 'img') content = `<img src="${data.image}">`;
+            else if (data.type === 'audio') content = `<audio controls src="${data.audio}"></audio>`;
+            else content = `<div>${data.text}</div>`;
+            div.innerHTML = `${content}<div class="meta"><span>${data.time}</span></div>`;
+            const container = document.getElementById('messages');
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // --- Image ---
+        function previewFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                pendingImage = e.target.result; 
+                document.getElementById('preview-img').src = pendingImage;
+                document.getElementById('img-preview-modal').style.display = 'flex';
+            };
+            reader.readAsDataURL(file);
+            input.value = ''; 
+        }
+
+        function confirmImageSend() {
+            if (pendingImage) {
+                publishMessage({ type: 'img', image: pendingImage });
+                document.getElementById('img-preview-modal').style.display = 'none';
+            }
+        }
+        function cancelImage() { document.getElementById('img-preview-modal').style.display = 'none'; }
+
+        // --- History ---
+        function saveToHistory(msg) {
+            let history = JSON.parse(localStorage.getItem(`chat_${roomName}`) || '[]');
+            history.push(msg);
+            if(history.length > 50) history.shift(); 
+            localStorage.setItem(`chat_${roomName}`, JSON.stringify(history));
+        }
+        function loadHistory() {
+            let history = JSON.parse(localStorage.getItem(`chat_${roomName}`) || '[]');
+            history.forEach(msg => renderMessage(msg, msg.sender === userName ? 'mine' : 'theirs'));
+        }
+
+        // --- Calls ---
+        async function startCall() {
+            document.getElementById('call-ui').style.display = 'flex';
+            document.getElementById('call-status').innerText = "Calling...";
+            document.getElementById('answer-btn').style.display = 'none';
+            playAudio('snd-ring');
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                createPeerConnection();
+                const offer = await peerConn.createOffer();
+                await peerConn.setLocalDescription(offer);
+                client.publish(`${roomName}/signal`, JSON.stringify({ type: 'offer', sdp: offer, sender: userName }));
+            } catch(e) { alert("Mic error!"); endCall(); }
+        }
+
+        async function handleSignaling(data) {
+            if (data.sender === userName) return;
+            if (data.type === 'offer') {
+                document.getElementById('call-ui').style.display = 'flex';
+                document.getElementById('call-status').innerText = `${data.sender} calling...`;
+                document.getElementById('answer-btn').style.display = 'flex';
+                playAudio('snd-ring');
+                document.getElementById('answer-btn').onclick = async () => {
+                    document.getElementById('snd-ring').pause();
+                    document.getElementById('answer-btn').style.display = 'none';
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    createPeerConnection();
+                    await peerConn.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                    const answer = await peerConn.createAnswer();
+                    await peerConn.setLocalDescription(answer);
+                    client.publish(`${roomName}/signal`, JSON.stringify({ type: 'answer', sdp: answer, sender: userName }));
+                };
+            } else if (data.type === 'answer') {
+                document.getElementById('snd-ring').pause();
+                document.getElementById('call-status').innerText = "Connected";
+                await peerConn.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            } else if (data.type === 'candidate' && peerConn) {
+                await peerConn.addIceCandidate(new RTCIceCandidate(data.candidate));
+            } else if (data.type === 'end') {
+                endCall(true);
+            }
+        }
+
+        function createPeerConnection() {
+            peerConn = new RTCPeerConnection(rtcConfig);
+            localStream.getTracks().forEach(t => peerConn.addTrack(t, localStream));
+            peerConn.onicecandidate = e => {
+                if (e.candidate) client.publish(`${roomName}/signal`, JSON.stringify({ type: 'candidate', candidate: e.candidate, sender: userName }));
+            };
+            peerConn.ontrack = e => { new Audio(URL.createObjectURL(e.streams[0])).play(); };
+        }
+
+        function endCall(isRemote = false) {
+            if (!isRemote) client.publish(`${roomName}/signal`, JSON.stringify({ type: 'end', sender: userName }));
+            if (localStream) localStream.getTracks().forEach(t => t.stop());
+            if (peerConn) peerConn.close();
+            document.getElementById('call-ui').style.display = 'none';
+            document.getElementById('snd-ring').pause();
+        }
+
+        function getTime() { return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+        function playAudio(id) { document.getElementById(id).play().catch(e => {}); }
+        document.getElementById('msg-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+    </script>
+</body>
+</html>
